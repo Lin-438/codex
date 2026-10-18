@@ -16,6 +16,14 @@ Python + OpenCV + MediaPipe Hand Landmarker，CPU 单手识别。默认只显示
 
 终端会打印 `accepted` 和 `readback`。若 `accepted=True` 且仍过亮，可依次试 `-8`、`-9`；若太暗则试 `-6`。这些值是摄像头驱动相关的示例，部分设备不支持 OpenCV 手动曝光。若返回 `accepted=False`，在 Windows「设置 → 蓝牙和设备 → 相机」中选择该摄像头调整亮度或曝光（若设备提供），并检查是否有强光直射或逆光。不要仅对画面做软件调暗：过曝丢失的手部细节无法恢复。
 
+若开启 `--backend dshow --exposure` 后帧率下降，画面中的 `Capture` 是摄像头读取耗时，`Detect` 是关键点推理耗时（毫秒）。`Capture` 较大时先恢复默认后端并用 Windows 相机设置调曝光；`Detect` 较大时可降低推理宽度：
+
+```powershell
+.\.venv314\Scripts\python.exe app.py --width 640 --height 480 --inference-width 320
+```
+
+默认沿用摄像头驱动的采集分辨率；上面的示例请求 640×480，并把推理图像缩到 320 像素宽。降低推理宽度可能让远处或很小的手难以识别；先在演示模式确认效果。实际采集分辨率以启动时终端输出为准。若不再需要软件曝光，请省略 `--backend` 和 `--exposure`。
+
 ## 安装与启动（Windows）
 
 推荐 Windows 10/11 64 位、Python 3.14/3.12/3.11 64 位、普通内置摄像头。3.11/3.12 使用 `requirements.txt`（MediaPipe 0.10.21 / OpenCV contrib 4.11.0.86 / NumPy 1.26.4）；3.14 使用 `requirements-py314.txt`（MediaPipe 0.10.35 / OpenCV contrib 4.13.0.92 / NumPy 2.3.5），由安装脚本自动选择。前者在 Linux Python 3.12 已验证；后者已核对 Windows 3.14 wheel，并在 Linux 上验证安装、导入与逻辑测试。两者均使用 Tasks Hand Landmarker API。Windows ARM 尚未验证。
@@ -66,6 +74,7 @@ https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/
 | --- | --- |
 | camera / model / mirror | 摄像头、本地模型、镜像 |
 | camera_backend / camera_exposure | Windows 可选的 DirectShow 后端与手动曝光；默认为 auto/null，不修改驱动曝光 |
+| width / height / inference_width | 请求的采集宽高与推理宽度；默认 null，不改变摄像头原有设置，单位像素 |
 | min_detection_confidence / min_tracking_confidence | 检测与跟踪阈值 |
 | hold_seconds | 张掌/握拳连续保持时间 |
 | stable_seconds | 起手和结束所需稳定时长 |

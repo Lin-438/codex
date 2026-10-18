@@ -15,6 +15,10 @@ def main():
                         help='Windows camera backend; dshow often exposes manual exposure')
     parser.add_argument('--exposure',type=float,
                         help='Manual camera exposure, e.g. -7 with DirectShow; device dependent')
+    parser.add_argument('--width',type=int,help='Requested capture width')
+    parser.add_argument('--height',type=int,help='Requested capture height')
+    parser.add_argument('--inference-width',type=int,
+                        help='Resize frames for hand detection; 320 can improve CPU speed')
     parser.add_argument('--control',action='store_true')
     args = parser.parse_args()
     cfg = load_config(args.config)
@@ -24,6 +28,10 @@ def main():
         cfg['camera_backend'] = args.backend
     if args.exposure is not None:
         cfg['camera_exposure'] = args.exposure
+    for name in ('width','height','inference_width'):
+        value = getattr(args,name)
+        if value is not None:
+            cfg[name] = value
     if args.control and sys.platform != 'win32':
         parser.error('--control requires Windows')
     templates = None
@@ -45,6 +53,7 @@ def main():
             fps = 1/max(now-previous,1e-6)
             previous = now
             lines = [f"{'CONTROL' if args.control else 'DEMO'} | {'ENABLED' if recognizer.enabled else 'PAUSED'} | FPS {fps:.1f}",
+                     f"Capture {camera.capture_ms:.0f} ms | Detect {camera.infer_ms:.0f} ms",
                      f"Hand: {'tracked' if points else 'missing'} | Result: {result if now < until else 'none'}",
                      'Open palm: enable / fist: pause / Q or Esc: exit']
             for i,line in enumerate(lines):

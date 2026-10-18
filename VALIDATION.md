@@ -7,18 +7,20 @@
 - `.venv/bin/python -m pip install -r requirements.txt`：成功。
 - `.venv/bin/python -m pip check`：成功，无依赖冲突。
 - 通过 pip 的跨平台解析/下载核对 Windows 64 位 CPython 3.12 与 3.14：各自固定版本及依赖均有相应 wheel。此项仅证明发行包可取得，未在 Windows 实际安装或运行。
-- 在独立 Linux Python 3.12 环境中安装 MediaPipe 0.10.35 / OpenCV 4.13.0 / NumPy 2.3.5：`pip check`、Tasks API 导入及 7 项测试通过。此项不等于在 Windows Python 3.14 上实际运行。
+- 在独立 Linux Python 3.12 环境中安装 MediaPipe 0.10.35 / OpenCV 4.13.0 / NumPy 2.3.5：`pip check`、Tasks API 导入及 8 项测试通过。此项不等于在 Windows Python 3.14 上实际运行。
 - 导入：MediaPipe 0.10.21 / OpenCV 4.11.0 / NumPy 1.26.4 成功。
-- `.venv/bin/python -m unittest discover -s tests -v`：7 项通过。
+- `.venv/bin/python -m unittest discover -s tests -v`：8 项通过。
   - 张掌与握拳形状、保持后暂停。
   - 单次连续挥手只触发一次。
   - 轻微抖动不翻页、初始暂停时不翻页。
   - 左右规则方向、DTW 距离与模板分类。
   - 丢手取消进行中的动作。
   - 临时目录合成片段完整通过分组、模板构建、双方法评价，检查按人员隔离及拒绝测试集训练。
+  - 推理图像缩小后，显示画面分辨率保持不变。
 - 编译检查及 app/tools 帮助入口：成功。
 - 已打包 Windows 安装与启动脚本；云端无法执行 `.cmd`，需用户电脑验证。
 - 手动曝光参数与 DirectShow 后端已加入程序；云端没有 Windows 摄像头，因此驱动是否接受 `--exposure` 仍需看本机输出的 `accepted/readback`。
+- 新增采集/推理耗时显示与可配置的采集、推理分辨率；真实摄像头帧率变化仍需本机测量。
 - `/dev/video*`：无设备。未执行摄像头采集、可视窗口交互、Windows SendInput 或 PPT 翻页。
 - 官方模型下载：代理 CONNECT 返回 403。未下载模型、未执行实际 Hand Landmarker 推理。模型域名已保存至环境网络配置草稿，保存不是当前实例已放行的证据。
 - 导入时 Matplotlib 的只读 HOME 缓存警告不影响上述测试；云端可设置 `MPLCONFIGDIR=/tmp/gesture-mpl` 后运行。

@@ -12,6 +12,9 @@ def load_config(path):
     cfg = json.loads(Path(path).read_text(encoding='utf-8'))
     if cfg.get('camera_backend', 'auto') not in ('auto', 'dshow', 'msmf'):
         raise ValueError('camera_backend must be auto, dshow or msmf')
+    for key in ('width','height','inference_width'):
+        if cfg.get(key) is not None and int(cfg[key]) <= 0:
+            raise ValueError(f'{key} must be positive')
     for key in ['hold_seconds','stable_seconds','cooldown_seconds','min_swipe','max_vertical','motion_start','motion_end','max_action_seconds','dtw_threshold']:
         if cfg[key] <= 0:
             raise ValueError(f'{key} must be positive')
@@ -42,6 +45,15 @@ class Camera:
         if not self.cap.isOpened():
             self.close()
             raise RuntimeError('Cannot open camera; check camera number and permissions')
+        if cfg.get('width') is not None:
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, int(cfg['width']))
+        if cfg.get('height') is not None:
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, int(cfg['height']))
+        actual_width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+        actual_height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        print(f'Camera resolution: {actual_width:g}x{actual_height:g}')
+        self.capture_ms = 0.0
+        self.infer_ms = 0.0
         if cfg.get('camera_exposure') is not None:
             if backend == 'dshow':
                 # DirectShow uses 0.25 for manual exposure and 0.75 for auto.
@@ -56,15 +68,25 @@ class Camera:
                 print('Camera driver did not accept manual exposure; use its Windows camera controls')
 
     def read(self):
+        capture_start = time.monotonic()
         ok, frame = self.cap.read()
+        self.capture_ms = (time.monotonic() - capture_start) * 1000
         if not ok:
             raise RuntimeError('Camera frame read failed')
         if self.cfg['mirror']:
             frame = cv2.flip(frame, 1)
-        now = time.monotonic()
-        self.timestamp = max(self.timestamp+1, int(now*1000))
+        infer_start = time.monotonic()
+        self.timestamp = max(self.timestamp+1, int(infer_start*1000))
+        inference_frame = frame
+        inference_width = self.cfg.get('inference_width')
+        if inference_width is not None and frame.shape[1] > int(inference_width):
+            inference_width = int(inference_width)
+            height = max(1, round(frame.shape[0] * inference_width / frame.shape[1]))
+            inference_frame = cv2.resize(frame, (inference_width, height),
+                                         interpolation=cv2.INTER_AREA)
         result = self.detector.detect_for_video(mp.Image(image_format=mp.ImageFormat.SRGB,
-                         data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)), self.timestamp)
+                         data=cv2.cvtColor(inference_frame, cv2.COLOR_BGR2RGB)), self.timestamp)
+        self.infer_ms = (time.monotonic() - infer_start) * 1000
         points = None
         if result.hand_landmarks:
             points = [[p.x,p.y,p.z] for p in result.hand_landmarks[0]]
@@ -74,7 +96,7 @@ class Camera:
                 cv2.line(frame,xy[a],xy[b],(80,220,80),2)
             for p in xy:
                 cv2.circle(frame,p,3,(0,180,255),-1)
-        return now,frame,points
+        return time.monotonic(),frame,points
 
     def close(self):
         self.cap.release()
