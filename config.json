@@ -2,6 +2,8 @@
   "camera": 0,
   "camera_backend": "auto",
   "camera_exposure": null,
+  "camera_gain": null,
+  "image_gamma": 1.0,
   "width": 640,
   "height": 480,
   "inference_width": 320,

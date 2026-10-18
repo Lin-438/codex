@@ -15,6 +15,10 @@ def main():
                         help='Windows camera backend; dshow often exposes manual exposure')
     parser.add_argument('--exposure',type=float,
                         help='Manual camera exposure, e.g. -7 with DirectShow; device dependent')
+    parser.add_argument('--gain',type=float,
+                        help='Camera sensor gain; range and support depend on the driver')
+    parser.add_argument('--gamma',type=float,
+                        help='Software brightening before detection; below 1 is brighter')
     parser.add_argument('--width',type=int,help='Requested capture width')
     parser.add_argument('--height',type=int,help='Requested capture height')
     parser.add_argument('--inference-width',type=int,
@@ -28,6 +32,10 @@ def main():
         cfg['camera_backend'] = args.backend
     if args.exposure is not None:
         cfg['camera_exposure'] = args.exposure
+    if args.gain is not None:
+        cfg['camera_gain'] = args.gain
+    if args.gamma is not None:
+        cfg['image_gamma'] = args.gamma
     for name in ('width','height','inference_width'):
         value = getattr(args,name)
         if value is not None:

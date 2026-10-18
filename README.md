@@ -16,13 +16,21 @@ Python + OpenCV + MediaPipe Hand Landmarker，CPU 单手识别。默认只显示
 
 终端会打印 `accepted` 和 `readback`。若 `accepted=True` 且仍过亮，可依次试 `-8`、`-9`；若太暗则试 `-6`。这些值是摄像头驱动相关的示例，部分设备不支持 OpenCV 手动曝光。若返回 `accepted=False`，在 Windows「设置 → 蓝牙和设备 → 相机」中选择该摄像头调整亮度或曝光（若设备提供），并检查是否有强光直射或逆光。不要仅对画面做软件调暗：过曝丢失的手部细节无法恢复。
 
+如果 `-6` 太暗，而 `-2` 帧率明显下降，先试 `-5`，并让台灯或室内灯从摄像头附近照向手掌。较长的摄像头曝光可能直接限制采集帧率；软件无法消除这段等待。新版程序也可在较短曝光下提亮中间亮度：
+
+```powershell
+.\.venv314\Scripts\python.exe app.py --backend dshow --exposure -5 --gamma 0.7
+```
+
+`--gamma` 默认 1.0；小于 1 变亮，例如 0.6 比 0.7 更亮。它用查找表处理已采集的帧，再送入手部检测，不会延长相机曝光；但无法恢复黑暗区域丢失的细节，太亮也可能让识别变差。若驱动支持增益，可另外试 `--gain 数值`；数值范围依设备而异，程序会打印是否接受及回读值，增益过高会增加噪声。建议先比较画面中的 `Capture` 和 `Detect` 耗时，再调整参数。
+
 若开启 `--backend dshow --exposure` 后帧率下降，画面中的 `Capture` 是摄像头读取耗时，`Detect` 是关键点推理耗时（毫秒）。`Capture` 较大时先恢复默认后端并用 Windows 相机设置调曝光；`Detect` 较大时可降低推理宽度：
 
 ```powershell
 .\.venv314\Scripts\python.exe app.py --width 640 --height 480 --inference-width 320
 ```
 
-现在默认请求 640×480，并把推理图像缩到 320 像素宽；可用 `--width`、`--height`、`--inference-width` 覆盖。降低推理宽度可能让远处或很小的手难以识别；先在演示模式确认效果。实际采集分辨率以启动时终端输出为准。若不再需要软件曝光，请省略 `--backend` 和 `--exposure`。
+现在默认请求 640×480，并把推理图像缩到 320 像素宽；可用 `--width`、`--height`、`--inference-width` 覆盖。降低推理宽度可能让远处或很小的手难以识别；先在演示模式确认效果。实际采集分辨率以启动时终端输出为准。若不再需要手动曝光，请省略 `--backend` 和 `--exposure`。
 
 ## 安装与启动（Windows）
 
@@ -74,6 +82,7 @@ https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/
 | --- | --- |
 | camera / model / mirror | 摄像头、本地模型、镜像 |
 | camera_backend / camera_exposure | Windows 可选的 DirectShow 后端与手动曝光；默认为 auto/null，不修改驱动曝光 |
+| camera_gain / image_gamma | 可选摄像头硬件增益 / 图像伽马；默认为 null/1.0，后者小于 1 可提亮 |
 | width / height / inference_width | 请求的采集宽高与推理宽度；默认 640/480/320，单位像素 |
 | max_frame_gap_seconds | 超过此时间没有下一帧则取消当前动作；默认 0.6 秒，兼容较慢 CPU |
 | min_detection_confidence / min_tracking_confidence | 检测与跟踪阈值 |

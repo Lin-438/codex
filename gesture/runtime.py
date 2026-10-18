@@ -1,9 +1,11 @@
 import json
+import math
 import sys
 import time
 from pathlib import Path
 import cv2
 import mediapipe as mp
+import numpy as np
 
 EDGES = [(0,1),(1,2),(2,3),(3,4),(0,5),(5,6),(6,7),(7,8),(5,9),(9,10),(10,11),(11,12),(9,13),(13,14),(14,15),(15,16),(13,17),(17,18),(18,19),(19,20),(0,17)]
 
@@ -20,13 +22,25 @@ def load_config(path):
             raise ValueError(f'{key} must be positive')
     if cfg.get('max_frame_gap_seconds', .6) <= 0:
         raise ValueError('max_frame_gap_seconds must be positive')
+    gamma = float(cfg.get('image_gamma', 1.0))
+    if not math.isfinite(gamma) or gamma <= 0:
+        raise ValueError('image_gamma must be positive')
     if cfg['method'] not in ('rule','dtw'):
         raise ValueError('method must be rule or dtw')
     return cfg
 
 
+def make_gamma_lut(gamma):
+    if not math.isfinite(gamma) or gamma <= 0:
+        raise ValueError('image_gamma must be positive')
+    return np.clip((np.arange(256) / 255.0) ** gamma * 255, 0, 255).astype(np.uint8)
+
+
 class Camera:
     def __init__(self, cfg):
+        gamma = float(cfg.get('image_gamma', 1.0))
+        if not math.isfinite(gamma) or gamma <= 0:
+            raise ValueError('image_gamma must be positive')
         if not Path(cfg['model']).is_file():
             raise FileNotFoundError('Model missing. Run: python tools.py download-model')
         options = mp.tasks.vision.HandLandmarkerOptions(
@@ -44,6 +58,7 @@ class Camera:
             'msmf': cv2.CAP_MSMF}[backend])
         self.cfg = cfg
         self.timestamp = -1
+        self.gamma_lut = make_gamma_lut(gamma) if gamma != 1.0 else None
         if not self.cap.isOpened():
             self.close()
             raise RuntimeError('Cannot open camera; check camera number and permissions')
@@ -67,6 +82,13 @@ class Camera:
             print(f'Camera exposure requested={requested:g}, accepted={accepted}, readback={actual:g}')
             if not accepted:
                 print('Camera driver did not accept manual exposure; use its Windows camera controls')
+        if cfg.get('camera_gain') is not None:
+            requested = float(cfg['camera_gain'])
+            accepted = self.cap.set(cv2.CAP_PROP_GAIN, requested)
+            actual = self.cap.get(cv2.CAP_PROP_GAIN)
+            print(f'Camera gain requested={requested:g}, accepted={accepted}, readback={actual:g}')
+            if not accepted:
+                print('Camera driver did not accept gain; try --gamma or add room lighting')
 
     def read(self):
         capture_start = time.monotonic()
@@ -76,6 +98,8 @@ class Camera:
             raise RuntimeError('Camera frame read failed')
         if self.cfg['mirror']:
             frame = cv2.flip(frame, 1)
+        if self.gamma_lut is not None:
+            frame = cv2.LUT(frame, self.gamma_lut)
         infer_start = time.monotonic()
         self.timestamp = max(self.timestamp+1, int(infer_start*1000))
         inference_frame = frame
