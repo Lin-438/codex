@@ -8,6 +8,14 @@ Python + OpenCV + MediaPipe Hand Landmarker，CPU 单手识别。默认只显示
 
 双击 `demo-windows.cmd` 进入不发送按键的演示模式。验证摄像头、动作和方向后，双击 `control-windows.cmd` 才启用前台 PPT 翻页。可从命令提示符运行 `demo-windows.cmd --camera 1` 切换摄像头。脚本只负责本机运行；电脑上的下载、权限、摄像头和 PPT 仍须在本机确认。
 
+如果画面过亮，在项目目录的 PowerShell 中先按 `Q` 退出当前窗口，再用手动曝光重新启动演示模式（Python 3.14 的虚拟环境名称按实际创建的目录修改）：
+
+```powershell
+.\.venv314\Scripts\python.exe app.py --backend dshow --exposure -7
+```
+
+终端会打印 `accepted` 和 `readback`。若 `accepted=True` 且仍过亮，可依次试 `-8`、`-9`；若太暗则试 `-6`。这些值是摄像头驱动相关的示例，部分设备不支持 OpenCV 手动曝光。若返回 `accepted=False`，在 Windows「设置 → 蓝牙和设备 → 相机」中选择该摄像头调整亮度或曝光（若设备提供），并检查是否有强光直射或逆光。不要仅对画面做软件调暗：过曝丢失的手部细节无法恢复。
+
 ## 安装与启动（Windows）
 
 推荐 Windows 10/11 64 位、Python 3.14/3.12/3.11 64 位、普通内置摄像头。3.11/3.12 使用 `requirements.txt`（MediaPipe 0.10.21 / OpenCV contrib 4.11.0.86 / NumPy 1.26.4）；3.14 使用 `requirements-py314.txt`（MediaPipe 0.10.35 / OpenCV contrib 4.13.0.92 / NumPy 2.3.5），由安装脚本自动选择。前者在 Linux Python 3.12 已验证；后者已核对 Windows 3.14 wheel，并在 Linux 上验证安装、导入与逻辑测试。两者均使用 Tasks Hand Landmarker API。Windows ARM 尚未验证。
@@ -57,6 +65,7 @@ https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/
 | 参数 | 含义 |
 | --- | --- |
 | camera / model / mirror | 摄像头、本地模型、镜像 |
+| camera_backend / camera_exposure | Windows 可选的 DirectShow 后端与手动曝光；默认为 auto/null，不修改驱动曝光 |
 | min_detection_confidence / min_tracking_confidence | 检测与跟踪阈值 |
 | hold_seconds | 张掌/握拳连续保持时间 |
 | stable_seconds | 起手和结束所需稳定时长 |

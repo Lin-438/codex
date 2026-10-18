@@ -18,6 +18,7 @@
   - 临时目录合成片段完整通过分组、模板构建、双方法评价，检查按人员隔离及拒绝测试集训练。
 - 编译检查及 app/tools 帮助入口：成功。
 - 已打包 Windows 安装与启动脚本；云端无法执行 `.cmd`，需用户电脑验证。
+- 手动曝光参数与 DirectShow 后端已加入程序；云端没有 Windows 摄像头，因此驱动是否接受 `--exposure` 仍需看本机输出的 `accepted/readback`。
 - `/dev/video*`：无设备。未执行摄像头采集、可视窗口交互、Windows SendInput 或 PPT 翻页。
 - 官方模型下载：代理 CONNECT 返回 403。未下载模型、未执行实际 Hand Landmarker 推理。模型域名已保存至环境网络配置草稿，保存不是当前实例已放行的证据。
 - 导入时 Matplotlib 的只读 HOME 缓存警告不影响上述测试；云端可设置 `MPLCONFIGDIR=/tmp/gesture-mpl` 后运行。

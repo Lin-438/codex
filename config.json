@@ -1,5 +1,7 @@
 {
   "camera": 0,
+  "camera_backend": "auto",
+  "camera_exposure": null,
   "model": "models/hand_landmarker.task",
   "mirror": true,
   "method": "rule",

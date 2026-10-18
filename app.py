@@ -11,11 +11,19 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', default='config.json')
     parser.add_argument('--camera',type=int)
+    parser.add_argument('--backend',choices=['auto','dshow','msmf'],
+                        help='Windows camera backend; dshow often exposes manual exposure')
+    parser.add_argument('--exposure',type=float,
+                        help='Manual camera exposure, e.g. -7 with DirectShow; device dependent')
     parser.add_argument('--control',action='store_true')
     args = parser.parse_args()
     cfg = load_config(args.config)
     if args.camera is not None:
         cfg['camera'] = args.camera
+    if args.backend is not None:
+        cfg['camera_backend'] = args.backend
+    if args.exposure is not None:
+        cfg['camera_exposure'] = args.exposure
     if args.control and sys.platform != 'win32':
         parser.error('--control requires Windows')
     templates = None

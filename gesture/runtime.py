@@ -1,4 +1,5 @@
 import json
+import sys
 import time
 from pathlib import Path
 import cv2
@@ -9,6 +10,8 @@ EDGES = [(0,1),(1,2),(2,3),(3,4),(0,5),(5,6),(6,7),(7,8),(5,9),(9,10),(10,11),(1
 
 def load_config(path):
     cfg = json.loads(Path(path).read_text(encoding='utf-8'))
+    if cfg.get('camera_backend', 'auto') not in ('auto', 'dshow', 'msmf'):
+        raise ValueError('camera_backend must be auto, dshow or msmf')
     for key in ['hold_seconds','stable_seconds','cooldown_seconds','min_swipe','max_vertical','motion_start','motion_end','max_action_seconds','dtw_threshold']:
         if cfg[key] <= 0:
             raise ValueError(f'{key} must be positive')
@@ -27,12 +30,30 @@ class Camera:
             min_hand_detection_confidence=cfg['min_detection_confidence'],
             min_tracking_confidence=cfg['min_tracking_confidence'])
         self.detector = mp.tasks.vision.HandLandmarker.create_from_options(options)
-        self.cap = cv2.VideoCapture(cfg['camera'])
+        backend = cfg.get('camera_backend', 'auto')
+        if backend != 'auto' and sys.platform != 'win32':
+            self.detector.close()
+            raise ValueError('dshow and msmf camera backends require Windows')
+        self.cap = cv2.VideoCapture(cfg['camera'], {
+            'auto': cv2.CAP_ANY, 'dshow': cv2.CAP_DSHOW,
+            'msmf': cv2.CAP_MSMF}[backend])
         self.cfg = cfg
         self.timestamp = -1
         if not self.cap.isOpened():
             self.close()
             raise RuntimeError('Cannot open camera; check camera number and permissions')
+        if cfg.get('camera_exposure') is not None:
+            if backend == 'dshow':
+                # DirectShow uses 0.25 for manual exposure and 0.75 for auto.
+                self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
+            elif backend == 'auto':
+                print('Tip: use --backend dshow on Windows for reliable manual exposure')
+            requested = float(cfg['camera_exposure'])
+            accepted = self.cap.set(cv2.CAP_PROP_EXPOSURE, requested)
+            actual = self.cap.get(cv2.CAP_PROP_EXPOSURE)
+            print(f'Camera exposure requested={requested:g}, accepted={accepted}, readback={actual:g}')
+            if not accepted:
+                print('Camera driver did not accept manual exposure; use its Windows camera controls')
 
     def read(self):
         ok, frame = self.cap.read()
