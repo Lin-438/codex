@@ -3,6 +3,7 @@ import math
 import numpy as np
 
 LABELS = ['left', 'right', 'open', 'fist', 'idle']
+MIN_STRAIGHTNESS = .8
 
 
 def features(points):
@@ -33,6 +34,33 @@ def motion_metrics(samples):
     return dx, vertical, straightness
 
 
+def direction_quality(samples, min_swipe):
+    """Allow one small preparation before a consistent main movement.
+
+    Full-clip displacement and vertical bounds are checked separately. A
+    preparation cannot itself reach command amplitude; both parts must be
+    directionally consistent. The original trajectory is never modified.
+    """
+    dx, _, straightness = motion_metrics(samples)
+    if straightness >= MIN_STRAIGHTNESS or dx == 0:
+        return straightness, 0.0
+    x = trajectory(samples)[:, 0]
+    direction = 1 if dx > 0 else -1
+    # Split only at the extreme opposite to the final direction, not an
+    # arbitrary favorable sub-clip that could hide later back-and-forth motion.
+    split = int(np.argmin(direction*x))
+    preparation = float(-direction*x[split])
+    if preparation <= 0 or preparation >= min_swipe or len(x)-split < 3:
+        return straightness, 0.0
+    prefix_path = float(np.abs(np.diff(x[:split+1])).sum())
+    main_path = float(np.abs(np.diff(x[split:])).sum())
+    prefix_quality = preparation / max(prefix_path, 1e-6)
+    main_quality = abs(float(x[-1]-x[split])) / max(main_path, 1e-6)
+    if prefix_quality >= MIN_STRAIGHTNESS and main_quality >= MIN_STRAIGHTNESS:
+        return main_quality, preparation
+    return straightness, 0.0
+
+
 def dtw(a, b):
     a, b = np.asarray(a), np.asarray(b)
     costs = np.full((len(a)+1, len(b)+1), np.inf)
@@ -47,9 +75,10 @@ def classify(samples, cfg, templates=None):
     if len(samples) < 3:
         return 'idle'
     a = trajectory(samples)
-    dx, vertical, straightness = motion_metrics(samples)
+    dx, vertical, _ = motion_metrics(samples)
+    quality, _ = direction_quality(samples, cfg['min_swipe'])
     valid = (abs(dx) >= cfg['min_swipe'] and vertical <= cfg['max_vertical']
-             and straightness >= .8)
+             and quality >= MIN_STRAIGHTNESS)
     if not valid:
         return 'idle'
     if cfg['method'] == 'dtw':
@@ -141,10 +170,13 @@ class Controller:
                 self.reset()
             elif t-self.still_since >= c['stable_seconds']:
                 label = classify(self.action, c, self.templates)
-                dx, vertical, straightness = motion_metrics(self.action)
+                dx, vertical, _ = motion_metrics(self.action)
+                quality, preparation = direction_quality(self.action, c['min_swipe'])
                 self.last_attempt = (f'{label} dx={dx:+.2f}/{c["min_swipe"]:.2f} '
                                      f'y={vertical:.2f}/{c["max_vertical"]:.2f} '
-                                     f'straight={straightness:.2f}')
+                                     f'straight={quality:.2f}')
+                if preparation:
+                    self.last_attempt += f' prep={preparation:.2f}'
                 self.last_attempt_at = t
                 self.reset()
                 if label != 'idle':
