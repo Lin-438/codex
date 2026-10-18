@@ -1,0 +1,18 @@
+{
+  "camera": 0,
+  "model": "models/hand_landmarker.task",
+  "mirror": true,
+  "method": "rule",
+  "templates": "data/templates.json",
+  "min_detection_confidence": 0.6,
+  "min_tracking_confidence": 0.6,
+  "hold_seconds": 0.8,
+  "stable_seconds": 0.18,
+  "cooldown_seconds": 1.0,
+  "min_swipe": 0.18,
+  "max_vertical": 0.12,
+  "motion_start": 0.035,
+  "motion_end": 0.018,
+  "max_action_seconds": 1.5,
+  "dtw_threshold": 0.18
+}
