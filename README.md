@@ -4,29 +4,29 @@ Python + OpenCV + MediaPipe Hand Landmarker，CPU 单手识别。默认只显示
 
 ## Windows 一键安装与运行
 
-将整个项目文件夹下载或解压到电脑（路径中不要只复制 `app.py`）。先安装 python.org 的 **64 位 Python 3.12 或 3.11**，安装时勾选 Python Launcher。双击 `install-windows.cmd`；它在本目录建立 `.venv`、安装固定依赖、下载模型并运行模型自检与测试。出现报错时命令窗口会停留，按提示排查。模型下载需要能访问官方 `storage.googleapis.com`；若被网络拦截，按下文手动下载放置模型，然后重跑安装脚本。
+将整个项目文件夹下载或解压到电脑（路径中不要只复制 `app.py`）。使用 python.org 的 **64 位 Python 3.14、3.12 或 3.11**，安装时勾选 Python Launcher。已有 3.14 的电脑无需另装 3.12。双击 `install-windows.cmd`；它在本目录建立 `.venv`、安装固定依赖、下载模型并运行模型自检与测试。出现报错时命令窗口会停留，按提示排查。模型下载需要能访问官方 `storage.googleapis.com`；若被网络拦截，按下文手动下载放置模型，然后重跑安装脚本。
 
 双击 `demo-windows.cmd` 进入不发送按键的演示模式。验证摄像头、动作和方向后，双击 `control-windows.cmd` 才启用前台 PPT 翻页。可从命令提示符运行 `demo-windows.cmd --camera 1` 切换摄像头。脚本只负责本机运行；电脑上的下载、权限、摄像头和 PPT 仍须在本机确认。
 
 ## 安装与启动（Windows）
 
-推荐 Windows 10/11 64 位、Python 3.11 或 3.12 64 位、普通内置摄像头。依赖固定为 MediaPipe 0.10.21 / OpenCV contrib 4.11.0.86 / NumPy 1.26.4；已在 Linux Python 3.12 验证安装及导入。该版本使用 Tasks Hand Landmarker API，不使用已弃用的 solutions.hands。其他 Python 版本、Windows ARM 尚未验证。
+推荐 Windows 10/11 64 位、Python 3.14/3.12/3.11 64 位、普通内置摄像头。3.11/3.12 使用 `requirements.txt`（MediaPipe 0.10.21 / OpenCV contrib 4.11.0.86 / NumPy 1.26.4）；3.14 使用 `requirements-py314.txt`（MediaPipe 0.10.35 / OpenCV contrib 4.13.0.92 / NumPy 2.3.5），由安装脚本自动选择。前者在 Linux Python 3.12 已验证；后者已核对 Windows 3.14 wheel，并在 Linux 上验证安装、导入与逻辑测试。两者均使用 Tasks Hand Landmarker API。Windows ARM 尚未验证。
 
 在项目根目录打开 PowerShell：
 
 ```powershell
-py -3.12 -m venv .venv
-.venv\Scripts\python -m pip install -r requirements.txt
-.venv\Scripts\python tools.py download-model
-.venv\Scripts\python app.py
+py -3.14 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-py314.txt
+.\.venv\Scripts\python.exe tools.py download-model
+.\.venv\Scripts\python.exe app.py
 ```
 
-若只有 Python 3.11，将第一条改为 `py -3.11`。不需要激活虚拟环境。Linux 对应解释器为 `.venv/bin/python`，需要桌面图形环境；无显示器的服务器不能直接显示摄像头窗口。不要安装 opencv-python-headless 或同时安装多个 OpenCV 包。
+手动命令以 Python 3.14 为例；使用 3.12 或 3.11 时，将第一条分别改为 `py -3.12` 或 `py -3.11`，第二条改用 `requirements.txt`。PowerShell 执行当前目录程序，路径前必须有 `.\`。不需要激活虚拟环境。Linux 对应解释器为 `.venv/bin/python`，需要桌面图形环境；无显示器的服务器不能直接显示摄像头窗口。不要安装 opencv-python-headless 或同时安装多个 OpenCV 包。
 
 ```powershell
-.venv\Scripts\python app.py --camera 1
-.venv\Scripts\python app.py --control
-.venv\Scripts\python -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe app.py --camera 1
+.\.venv\Scripts\python.exe app.py --control
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
 `--camera` 临时覆盖配置的摄像头编号，内置摄像头一般是 0。打不开时检查系统相机权限、是否被其他软件占用，尝试 1 或 2。Q、Esc 或关闭窗口退出，finally 释放摄像头。实际控制时摄像头窗口失去焦点，需切回窗口才能使用退出键；控制台 Ctrl+C 也会释放资源。
@@ -77,7 +77,7 @@ https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/
 每条 JSON 是一个完整独立片段：包括 label、person、recording、mirror、intent_start 和每帧时间、原始 21×3 点、掌心、相对坐标、姿态。丢手帧保留 points=null。只保存关键点，不保存人脸视频，但人员数据仍应征得同意。
 
 ```powershell
-.venv\Scripts\python tools.py collect --label right --person P01 --recording P01_session01 --output data/clips/P01_right_01.json
+.\.venv\Scripts\python.exe tools.py collect --label right --person P01 --recording P01_session01 --output data/clips/P01_right_01.json
 ```
 
 SPACE 开始、Q 结束。label 可选 left/right/open/fist/idle，由命令行指定即完成片段标签。每个动作片段只做一次目标动作，留约 0.3 秒稳定起点和终点。left/right 使用张掌；静态 open/fist 持续超过保持时间。idle 应录制长时间自然讲演、抓头、指点、轻微抖动、离开画面等，不能只录空画面。
@@ -87,10 +87,10 @@ recording 是**原始录制场次 ID**，同一连续录制裁出的所有片段
 ## 人员划分、DTW 与评价
 
 ```powershell
-.venv\Scripts\python tools.py split --data data/clips --group person
-.venv\Scripts\python tools.py train-dtw --split data/split.json
-.venv\Scripts\python tools.py evaluate --partition val --templates data/templates.json --output reports/validation.json
-.venv\Scripts\python tools.py evaluate --partition test --templates data/templates.json
+.\.venv\Scripts\python.exe tools.py split --data data/clips --group person
+.\.venv\Scripts\python.exe tools.py train-dtw --split data/split.json
+.\.venv\Scripts\python.exe tools.py evaluate --partition val --templates data/templates.json --output reports/validation.json
+.\.venv\Scripts\python.exe tools.py evaluate --partition test --templates data/templates.json
 ```
 
 默认随机种子 42，按组约 60/20/20 分 train/val/test，至少三个组；也可 `--group recording` 进行独立场次评估。同一人员若跨集合，必须明确这是跨场次而非跨人员泛化。禁止按相邻帧随机划分。训练集制作模板，验证集调阈值，最后固定配置再跑测试集。检查划分后各集合动作覆盖；分组随机分配不保证类别平衡，缺失类别结果为 null。

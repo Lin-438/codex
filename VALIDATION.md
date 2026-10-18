@@ -6,7 +6,8 @@
 
 - `.venv/bin/python -m pip install -r requirements.txt`：成功。
 - `.venv/bin/python -m pip check`：成功，无依赖冲突。
-- 通过 pip 的跨平台解析/下载核对 Windows 64 位 CPython 3.12：固定版本及其依赖均有相应 wheel。此项仅证明发行包可取得，未在 Windows 实际安装或运行。
+- 通过 pip 的跨平台解析/下载核对 Windows 64 位 CPython 3.12 与 3.14：各自固定版本及依赖均有相应 wheel。此项仅证明发行包可取得，未在 Windows 实际安装或运行。
+- 在独立 Linux Python 3.12 环境中安装 MediaPipe 0.10.35 / OpenCV 4.13.0 / NumPy 2.3.5：`pip check`、Tasks API 导入及 7 项测试通过。此项不等于在 Windows Python 3.14 上实际运行。
 - 导入：MediaPipe 0.10.21 / OpenCV 4.11.0 / NumPy 1.26.4 成功。
 - `.venv/bin/python -m unittest discover -s tests -v`：7 项通过。
   - 张掌与握拳形状、保持后暂停。
