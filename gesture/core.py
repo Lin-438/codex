@@ -88,7 +88,8 @@ class Controller:
                 self.last_attempt, self.last_attempt_at = 'tracking lost', t
             self.reset()  # never finish a gesture after tracking loss
             return None
-        if self.last_time is not None and (t <= self.last_time or t-self.last_time > .25):
+        if self.last_time is not None and (t <= self.last_time or
+                                           t-self.last_time > c.get('max_frame_gap_seconds', .6)):
             if self.action:
                 self.last_attempt, self.last_attempt_at = 'frame gap', t
             self.reset()

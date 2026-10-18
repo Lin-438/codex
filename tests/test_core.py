@@ -36,6 +36,20 @@ class Tests(unittest.TestCase):
                 events.append(event)
         self.assertEqual(events, ['right'])
 
+    def test_low_fps_hold_and_long_gap_cancellation(self):
+        c = Controller(CFG)
+        events = [c.update(i*.28, hand()) for i in range(5)]
+        self.assertIn('enabled', events)
+        c = Controller(CFG)
+        c.enabled = True
+        c.update(0, hand(.3))
+        c.update(.28, hand(.3))
+        c.update(.56, hand(.4))
+        self.assertTrue(c.action)
+        self.assertIsNone(c.update(1.3, hand(.5)))
+        self.assertEqual(c.last_attempt, 'frame gap')
+        self.assertFalse(c.action)
+
     def test_return_swing_does_not_trigger(self):
         c = Controller(CFG)
         c.enabled = True

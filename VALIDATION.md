@@ -9,7 +9,7 @@
 - 通过 pip 的跨平台解析/下载核对 Windows 64 位 CPython 3.12 与 3.14：各自固定版本及依赖均有相应 wheel。此项仅证明发行包可取得，未在 Windows 实际安装或运行。
 - 在独立 Linux Python 3.12 环境中安装 MediaPipe 0.10.35 / OpenCV 4.13.0 / NumPy 2.3.5：`pip check`、Tasks API 导入及此前 8 项测试通过。此项不等于在 Windows Python 3.14 上实际运行。
 - 导入：MediaPipe 0.10.21 / OpenCV 4.11.0 / NumPy 1.26.4 成功。
-- `.venv/bin/python -m unittest discover -s tests -v`：10 项通过。
+- `.venv/bin/python -m unittest discover -s tests -v`：11 项通过。
   - 张掌与握拳形状、保持后暂停。
   - 单次连续挥手只触发一次。
   - 轻微抖动不翻页、初始暂停时不翻页。
@@ -18,6 +18,7 @@
   - 临时目录合成片段完整通过分组、模板构建、双方法评价，检查按人员隔离及拒绝测试集训练。
   - 推理图像缩小后，显示画面分辨率保持不变。
   - 中等幅度挥手即使有一帧姿态波动仍触发；往返摆动不触发。
+  - 约 4 FPS 时张掌保持仍可启用控制，长时间断帧会取消动作。
 - 编译检查及 app/tools 帮助入口：成功。
 - 已打包 Windows 安装与启动脚本；云端无法执行 `.cmd`，需用户电脑验证。
 - 手动曝光参数与 DirectShow 后端已加入程序；云端没有 Windows 摄像头，因此驱动是否接受 `--exposure` 仍需看本机输出的 `accepted/readback`。

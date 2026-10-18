@@ -22,7 +22,7 @@ Python + OpenCV + MediaPipe Hand Landmarker，CPU 单手识别。默认只显示
 .\.venv314\Scripts\python.exe app.py --width 640 --height 480 --inference-width 320
 ```
 
-默认沿用摄像头驱动的采集分辨率；上面的示例请求 640×480，并把推理图像缩到 320 像素宽。降低推理宽度可能让远处或很小的手难以识别；先在演示模式确认效果。实际采集分辨率以启动时终端输出为准。若不再需要软件曝光，请省略 `--backend` 和 `--exposure`。
+现在默认请求 640×480，并把推理图像缩到 320 像素宽；可用 `--width`、`--height`、`--inference-width` 覆盖。降低推理宽度可能让远处或很小的手难以识别；先在演示模式确认效果。实际采集分辨率以启动时终端输出为准。若不再需要软件曝光，请省略 `--backend` 和 `--exposure`。
 
 ## 安装与启动（Windows）
 
@@ -74,7 +74,8 @@ https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/
 | --- | --- |
 | camera / model / mirror | 摄像头、本地模型、镜像 |
 | camera_backend / camera_exposure | Windows 可选的 DirectShow 后端与手动曝光；默认为 auto/null，不修改驱动曝光 |
-| width / height / inference_width | 请求的采集宽高与推理宽度；默认 null，不改变摄像头原有设置，单位像素 |
+| width / height / inference_width | 请求的采集宽高与推理宽度；默认 640/480/320，单位像素 |
+| max_frame_gap_seconds | 超过此时间没有下一帧则取消当前动作；默认 0.6 秒，兼容较慢 CPU |
 | min_detection_confidence / min_tracking_confidence | 检测与跟踪阈值 |
 | hold_seconds | 张掌/握拳连续保持时间 |
 | stable_seconds | 起手和结束所需稳定时长 |
@@ -86,9 +87,9 @@ https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/
 
 关键点提取保存两种表示：掌心（腕与四个掌指关节均值）在画面中的**绝对位置轨迹**，以及以腕为原点、掌长归一化的 21 点**相对形状**。因此归一化手形不会抹去挥手位移。张掌/握拳由四指指尖到腕距离相对中间关节距离判断，拇指不参与；允许其中一指短暂弯曲。该判断属于简化姿态规则。
 
-控制器：暂停 → 张掌保持 → 启用 → 稳定起手 → 水平运动 → 稳定结束 → 单次输出 → 冷却后重新稳定。手消失、时间断档超过 0.25 秒、动作超时均取消未完成动作。手消失不会自动改变启用状态，返回后需要重新稳定。只有张掌可开始挥手，动作中允许不超过 0.15 秒的短暂姿态波动；方向一致性需达到 0.8，减少抖动与往返误触。自然水平摆手若满足全部条件仍可能误触，不能保证理解人的意图。
+控制器：暂停 → 张掌保持 → 启用 → 稳定起手 → 水平运动 → 稳定结束 → 单次输出 → 冷却后重新稳定。手消失、时间断档超过 0.6 秒、动作超时均取消未完成动作。手消失不会自动改变启用状态，返回后需要重新稳定。只有张掌可开始挥手，动作中允许不超过 0.15 秒的短暂姿态波动；方向一致性需达到 0.8，减少抖动与往返误触。自然水平摆手若满足全部条件仍可能误触，不能保证理解人的意图。
 
-如果长时间没有 `left/right`，先看 `ENABLED`、`Hand: tracked`、`Pose: open` 和阶段提示。`HOLD STILL` 表示还没稳定起手，`READY` 表示可以开始挥手，`MOVING` 表示正在跟踪动作。默认最小水平位移为画面宽度的 12%（640 像素宽约 77 像素），应在手掌正对摄像头时从一侧直线挥到另一侧，停约 0.2 秒后再收回。`Last event` 保留上次指令；`Last motion` 显示最近动作的位移、纵向偏移和直线程度，或被取消的原因。若姿态经常变成 `idle`，先改善光线和手掌朝向。调小 `min_swipe` 会提高触发率，也会增加自然动作误触风险，实际演示前请用 `idle` 片段评价。
+如果画面仍只有三行状态（没有 `Pose`、`Capture`），正在运行旧版代码；请下载最新源码并更新 `app.py`、`gesture/core.py`、`gesture/runtime.py`、`config.json`。如果长时间没有 `left/right`，先看 `ENABLED`、`Hand: tracked`、`Pose: open` 和阶段提示。`HOLD STILL` 表示还没稳定起手，`READY` 表示可以开始挥手，`MOVING` 表示正在跟踪动作。默认最小水平位移为画面宽度的 12%（640 像素宽约 77 像素），应在手掌正对摄像头时从一侧直线挥到另一侧，停约 0.2 秒后再收回。`Last event` 保留上次指令；`Last motion` 显示最近动作的位移、纵向偏移和直线程度，或被取消的原因。若姿态经常变成 `idle`，先改善光线和手掌朝向。调小 `min_swipe` 会提高触发率，也会增加自然动作误触风险，实际演示前请用 `idle` 片段评价。
 
 规则基线使用方向、净位移、纵向范围、水平路径一致性；DTW 使用减去首点后的二维掌心轨迹，保留幅度与方向，通过动态规划匹配训练片段。DTW 同样经过运动门限，比较的是共享门控后的规则方向与轨迹模板识别；不会声称是纯无门控 DTW。时间/空间复杂度 O(NM)，适合短片段，模板过多会影响帧率。所有计算默认 CPU。
 

@@ -18,6 +18,8 @@ def load_config(path):
     for key in ['hold_seconds','stable_seconds','cooldown_seconds','min_swipe','max_vertical','motion_start','motion_end','max_action_seconds','dtw_threshold']:
         if cfg[key] <= 0:
             raise ValueError(f'{key} must be positive')
+    if cfg.get('max_frame_gap_seconds', .6) <= 0:
+        raise ValueError('max_frame_gap_seconds must be positive')
     if cfg['method'] not in ('rule','dtw'):
         raise ValueError('method must be rule or dtw')
     return cfg
@@ -45,13 +47,12 @@ class Camera:
         if not self.cap.isOpened():
             self.close()
             raise RuntimeError('Cannot open camera; check camera number and permissions')
-        if cfg.get('width') is not None:
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, int(cfg['width']))
-        if cfg.get('height') is not None:
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, int(cfg['height']))
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, int(cfg.get('width') or 640))
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, int(cfg.get('height') or 480))
         actual_width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
         actual_height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-        print(f'Camera resolution: {actual_width:g}x{actual_height:g}')
+        print(f'Camera resolution: {actual_width:g}x{actual_height:g}; '
+              f'inference width: {int(cfg.get("inference_width") or 320)}')
         self.capture_ms = 0.0
         self.infer_ms = 0.0
         if cfg.get('camera_exposure') is not None:
@@ -78,9 +79,8 @@ class Camera:
         infer_start = time.monotonic()
         self.timestamp = max(self.timestamp+1, int(infer_start*1000))
         inference_frame = frame
-        inference_width = self.cfg.get('inference_width')
-        if inference_width is not None and frame.shape[1] > int(inference_width):
-            inference_width = int(inference_width)
+        inference_width = int(self.cfg.get('inference_width') or 320)
+        if frame.shape[1] > inference_width:
             height = max(1, round(frame.shape[0] * inference_width / frame.shape[1]))
             inference_frame = cv2.resize(frame, (inference_width, height),
                                          interpolation=cv2.INTER_AREA)
