@@ -4,7 +4,7 @@ Python + OpenCV + MediaPipe Hand Landmarker，CPU 单手识别。默认只显示
 
 ## Windows 一键安装与运行
 
-将整个项目文件夹下载或解压到电脑（路径中不要只复制 `app.py`）。使用 python.org 的 **64 位 Python 3.14、3.12 或 3.11**，安装时勾选 Python Launcher。已有 3.14 的电脑无需另装 3.12。双击 `install-windows.cmd`；它在本目录建立 `.venv`、安装固定依赖、下载模型并运行模型自检与测试。出现报错时命令窗口会停留，按提示排查。模型下载需要能访问官方 `storage.googleapis.com`；若被网络拦截，按下文手动下载放置模型，然后重跑安装脚本。
+将整个项目文件夹下载或解压到电脑（路径中不要只复制 `app.py`）。使用 python.org 的 **64 位 Python 3.14、3.12 或 3.11**，安装时勾选 Python Launcher。已有 3.14 的电脑无需另装 3.12。双击 `install-windows.cmd`；它在本目录建立 `.venv`、安装固定依赖、下载模型并运行模型自检与测试。安装脚本会保留无法使用的旧 `.venv` 为 `.venv-backup-*`，重新创建可用环境；出现报错时命令窗口会停留，按提示排查。模型下载需要能访问官方 `storage.googleapis.com`；若被网络拦截，按下文手动下载放置模型，然后重跑安装脚本。
 
 双击 `demo-windows.cmd` 进入不发送按键的演示模式。验证摄像头、动作和方向后，双击 `control-windows.cmd` 才启用前台 PPT 翻页。可从命令提示符运行 `demo-windows.cmd --camera 1` 切换摄像头。脚本只负责本机运行；电脑上的下载、权限、摄像头和 PPT 仍须在本机确认。
 

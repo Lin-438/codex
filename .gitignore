@@ -4,3 +4,5 @@ __pycache__/
 models/*.task
 data/*.json
 reports/
+.venv314/
+.venv-backup-*/
