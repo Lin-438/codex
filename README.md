@@ -72,6 +72,16 @@ https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/
 4. 默认 DEMO 只显示 left/right 指令。`--control` 为 Windows 实际按键模式，经 SendInput 发送方向键。请先演示模式调好再使用。
 5. 在 PowerPoint/WPS 中启动放映后，使用 Alt+Tab 或鼠标将放映窗口置于前台。程序不会自动切换窗口。方向键发送给**当前前台应用**，可能影响其他软件；应用与程序应使用相同权限级别。不要以管理员身份运行 PPT 而以普通身份运行本程序。
 
+如果 `CONTROL / ENABLED / READY` 下 PPT 仍无响应，`Last event: enabled` 只表示控制已启用。先观察手掌水平移动时是否进入 `MOVING`，然后停住，确认 `Last event` 出现 `left/right`。新版会一直保留最近一次 `Last motion` 失败原因，并在终端打印 `Motion:`、`Gesture:`；成功调用 Windows 按键接口后还会打印 `Key: ... accepted by Windows`。Windows 接受事件并不证明 PPT 已翻页。
+
+可独立测试按键通路，无需摄像头或更新源码：先按 Q 退出摄像头程序，将 PPT 打开放映到中间一页，确认实体右方向键可以翻页。再回到 PowerShell 执行下方命令，在打印提示后的 5 秒内用 Alt+Tab 切回 PPT 放映窗口。命令只发送一次右方向键，Ctrl+C 可在倒计时内取消：
+
+```powershell
+.\.venv314\Scripts\python.exe -c "import time; from gesture.runtime import send_key; print('Switch to the slideshow now; RIGHT in 5 seconds', flush=True); time.sleep(5); send_key('right'); print('Windows accepted RIGHT')"
+```
+
+若此测试能翻页而手势不能，继续根据 `Last motion` 查动作识别；若测试不能翻页，检查终端报错、放映窗口焦点，以及 PPT 与 Python 是否以相同权限级别运行。测试期间不需挥手。虚拟环境名称按实际目录修改。
+
 默认 `mirror: true`，先镜像再提取关键点，方向相对于你看到的自拍画面。关闭镜像后方向相对于原始画面，体感左右可能相反。不要在摄像头驱动中再做一次镜像。只跟踪一只手，演示时避免第二只手进入画面；多人交替、快速换手可能产生关键点身份切换。
 
 ## 配置与方法

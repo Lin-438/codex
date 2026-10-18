@@ -53,11 +53,16 @@ def main():
     try:
         while True:
             now, frame, points = camera.read()
+            previous_attempt_at = recognizer.last_attempt_at
             command = recognizer.update(now,points)
+            if recognizer.last_attempt_at != previous_attempt_at:
+                print(f'Motion: {recognizer.last_attempt}', flush=True)
             if command:
                 result = command
+                print(f'Gesture: {command}', flush=True)
                 if args.control and command in ('left','right'):
                     send_key(command)
+                    print(f'Key: {command} accepted by Windows', flush=True)
             fps = 1/max(now-previous,1e-6)
             previous = now
             phase = ('PAUSED' if not recognizer.enabled else
@@ -68,7 +73,7 @@ def main():
                 dx = (recognizer.action[-1]['center'][0]
                       - recognizer.action[0]['center'][0])
                 attempt = f'Motion dx={dx:+.2f} / {cfg["min_swipe"]:.2f}'
-            elif now-recognizer.last_attempt_at < 3:
+            elif recognizer.last_attempt is not None:
                 attempt = f'Last motion: {recognizer.last_attempt}'
             else:
                 attempt = 'Last motion: none'
