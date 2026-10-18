@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path
 import urllib.request
 import numpy as np
@@ -186,6 +187,131 @@ def evaluate(args):
     print(json.dumps(report,ensure_ascii=False,indent=2))
 
 
+def summarize_trace(path):
+    """Inspect recorded observations only; never open hardware or send input."""
+    meta = None
+    frame_count = missing_count = 0
+    first_time = last_time = None
+    segments, attempts = [], []
+    segment = None
+    events = {name: 0 for name in ('enabled', 'paused', 'left', 'right')}
+    phases = {'PAUSED', 'COOLDOWN', 'MOVING', 'READY', 'HOLD STILL'}
+
+    def invalid(line, message):
+        raise ValueError(f'Trace line {line}: {message}')
+
+    def reject_constant(value):
+        raise ValueError(f'Non-finite JSON number: {value}')
+
+    def parse_finite_float(value):
+        result = float(value)
+        if not math.isfinite(result):
+            raise ValueError(f'Non-finite JSON number: {value}')
+        return result
+
+    def finite_number(value):
+        try:
+            return type(value) in (int, float) and math.isfinite(value)
+        except OverflowError:
+            return False
+
+    with Path(path).open(encoding='utf-8') as stream:
+        for line_number, line in enumerate(stream, 1):
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line, parse_constant=reject_constant,
+                                    parse_float=parse_finite_float)
+            except ValueError as error:
+                invalid(line_number, f'invalid JSON ({error})')
+            if not isinstance(record, dict):
+                invalid(line_number, 'expected a JSON object')
+            if meta is None:
+                if (record.get('type') != 'meta' or type(record.get('schema')) is not int
+                        or record['schema'] != 1):
+                    invalid(line_number, 'first record must be meta with schema 1')
+                if not isinstance(record.get('config'), dict):
+                    invalid(line_number, 'meta.config must be an object')
+                if record.get('mode') not in ('demo', 'control'):
+                    invalid(line_number, 'meta.mode must be demo or control')
+                meta = record
+                continue
+            if record.get('type') != 'frame':
+                invalid(line_number, 'expected a frame record')
+            if not {'t', 'points', 'event', 'phase', 'attempt'} <= record.keys():
+                invalid(line_number, 'missing required frame fields')
+            t = record['t']
+            if not finite_number(t) or t < 0 or (last_time is not None and t <= last_time):
+                invalid(line_number, 'frame times must be finite, non-negative and strictly increasing')
+            event = record['event']
+            if event is not None and (not isinstance(event, str) or event not in events):
+                invalid(line_number, 'unknown event')
+            if not isinstance(record['phase'], str) or record['phase'] not in phases:
+                invalid(line_number, 'unknown phase')
+            attempt = record['attempt']
+            if attempt is not None and not isinstance(attempt, str):
+                invalid(line_number, 'attempt must be a string or null')
+            points = record['points']
+            if points is not None:
+                if (not isinstance(points, list) or len(points) != 21
+                        or any(not isinstance(p, list) or len(p) != 3
+                               or not all(finite_number(v) for v in p) for p in points)):
+                    invalid(line_number, 'points must be null or 21 rows of 3 finite numbers')
+                # Match the controller's palm center without normalizing away motion.
+                center = np.asarray(points, dtype=float)[[0, 5, 9, 13, 17], :2].mean(axis=0)
+                if not np.isfinite(center).all():
+                    invalid(line_number, 'palm center is not finite')
+                x, y = map(float, center)
+                if segment is None:
+                    segment = {'start_seconds': t, 'end_seconds': t, 'frames': 0,
+                               'x_min': x, 'x_max': x, 'y_min': y, 'y_max': y}
+                    segments.append(segment)
+                segment['end_seconds'] = t
+                segment['frames'] += 1
+                segment['x_min'] = min(segment['x_min'], x)
+                segment['x_max'] = max(segment['x_max'], x)
+                segment['y_min'] = min(segment['y_min'], y)
+                segment['y_max'] = max(segment['y_max'], y)
+            else:
+                missing_count += 1
+                segment = None
+            if event is not None:
+                events[event] += 1
+            if attempt is not None:
+                attempts.append({'t': t, 'text': attempt})
+            frame_count += 1
+            first_time = t if first_time is None else first_time
+            last_time = t
+    if meta is None:
+        raise ValueError('Trace is empty or missing meta with schema 1')
+    if not frame_count:
+        raise ValueError('Trace contains no frames')
+    for segment in segments:
+        segment['duration_seconds'] = segment['end_seconds'] - segment['start_seconds']
+        segment['x_range'] = segment['x_max'] - segment['x_min']
+        segment['y_range'] = segment['y_max'] - segment['y_min']
+    duration = last_time - first_time
+    return {
+        'schema': 1, 'kind': 'trace_summary', 'mode': meta['mode'], 'config': meta['config'],
+        'note': ('仅为已记录关键点和程序事件的诊断统计，不包含动作意图标注，不是识别准确率。'
+                 'tracked 段按相邻非空帧划分；掌心坐标为画面归一化坐标，范围不是一次动作的净位移，'
+                 '不代表动作已通过判定；事件记录不能证明 Windows 已接收按键或 PPT 已翻页。'),
+        'frames': frame_count, 'duration_seconds': duration,
+        'average_fps': (frame_count - 1) / duration if duration else None,
+        'missing_frames': missing_count, 'missing_ratio': missing_count / frame_count,
+        'tracked_segments': segments, 'event_counts': events, 'attempts': attempts,
+    }
+
+
+def inspect_trace(args):
+    if args.output and Path(args.output).resolve() == Path(args.input).resolve():
+        raise ValueError('Summary output must differ from the input trace')
+    report = summarize_trace(args.input)
+    if args.output:
+        save(args.output, report)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+
+
 def main():
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest='command',required=True)
@@ -199,6 +325,9 @@ def main():
     p = sub.add_parser('split'); p.set_defaults(fn=split)
     p.add_argument('--data',default='data/clips'); p.add_argument('--group',choices=['person','recording'],default='person')
     p.add_argument('--seed',type=int,default=42); p.add_argument('--output',default='data/split.json')
+    p = sub.add_parser('inspect-trace'); p.set_defaults(fn=inspect_trace)
+    p.add_argument('--input',required=True,help='JSONL trace recorded by app.py --trace')
+    p.add_argument('--output',help='Also save the diagnostic JSON summary')
     for name,fn in [('train-dtw',train),('evaluate',evaluate)]:
         p = sub.add_parser(name); p.set_defaults(fn=fn)
         p.add_argument('--split',default='data/split.json')

@@ -1,10 +1,37 @@
 import argparse
+from contextlib import ExitStack
 import json
+from pathlib import Path
 import sys
 import time
 import cv2
-from gesture.core import Controller
+from gesture.core import Controller, features
 from gesture.runtime import Camera, load_config, send_key
+
+
+def draw_motion_guide(frame, recognizer, points):
+    if points is None:
+        return
+    center, _, _ = features(points)
+    height, width = frame.shape[:2]
+    current = (round(center[0]*width), round(center[1]*height))
+    cv2.circle(frame, current, 8, (255,255,255), 2)
+    cv2.putText(frame, 'PALM', (current[0]+10, current[1]-10),
+                cv2.FONT_HERSHEY_SIMPLEX, .45, (255,255,255), 1)
+    start = (recognizer.action[0] if recognizer.action else
+             recognizer.anchor if recognizer.armed else None)
+    if start is None:
+        return
+    x, y = start['center']
+    origin = (round(x*width), round(y*height))
+    cv2.circle(frame, origin, 4, (255,180,0), 2)
+    cv2.line(frame, origin, current, (255,180,0), 2)
+    for label, direction in [('L',-1), ('R',1)]:
+        target_x = round((x+direction*recognizer.cfg['min_swipe'])*width)
+        cv2.line(frame, (target_x,origin[1]-18), (target_x,origin[1]+18),
+                 (255,180,0), 2)
+        cv2.putText(frame, label, (target_x-5,origin[1]-22),
+                    cv2.FONT_HERSHEY_SIMPLEX, .5, (255,180,0), 1)
 
 
 def main():
@@ -24,6 +51,8 @@ def main():
     parser.add_argument('--inference-width',type=int,
                         help='Resize frames for hand detection; 320 can improve CPU speed')
     parser.add_argument('--control',action='store_true')
+    parser.add_argument('--trace', metavar='PATH',
+                        help='Record keypoints and decisions as JSONL; no images; refuses overwrite')
     args = parser.parse_args()
     cfg = load_config(args.config)
     if args.camera is not None:
@@ -48,27 +77,50 @@ def main():
         if not templates:
             raise ValueError('Empty DTW template set')
     recognizer = Controller(cfg, templates)
-    camera = Camera(cfg)
-    result, previous = 'none',time.monotonic()
-    try:
+    with ExitStack() as resources:
+        trace = None
+        if args.trace:
+            path = Path(args.trace)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            trace = resources.enter_context(path.open('x', encoding='utf-8'))
+            trace.write(json.dumps({'type':'meta', 'schema':1, 'config':cfg,
+                                   'mode':'control' if args.control else 'demo'},
+                                  allow_nan=False) + '\n')
+            trace.flush()
+            print(f'Recording keypoints and decisions to {path}; Q finishes recording', flush=True)
+        camera = Camera(cfg)
+        resources.callback(camera.close)
+        result, previous = 'none',time.monotonic()
+        trace_start = None
         while True:
             now, frame, points = camera.read()
             previous_attempt_at = recognizer.last_attempt_at
             command = recognizer.update(now,points)
-            if recognizer.last_attempt_at != previous_attempt_at:
-                print(f'Motion: {recognizer.last_attempt}', flush=True)
+            new_attempt = (recognizer.last_attempt
+                           if recognizer.last_attempt_at != previous_attempt_at else None)
+            if new_attempt is not None:
+                print(f'Motion: {new_attempt}', flush=True)
             if command:
                 result = command
                 print(f'Gesture: {command}', flush=True)
-                if args.control and command in ('left','right'):
-                    send_key(command)
-                    print(f'Key: {command} accepted by Windows', flush=True)
             fps = 1/max(now-previous,1e-6)
             previous = now
             phase = ('PAUSED' if not recognizer.enabled else
                      'COOLDOWN' if now-recognizer.last_command < cfg['cooldown_seconds'] else
                      'MOVING' if recognizer.action else
                      'READY' if recognizer.armed else 'HOLD STILL')
+            if trace is not None:
+                if trace_start is None:
+                    trace_start = now
+                trace.write(json.dumps({'type':'frame', 't':now-trace_start,
+                                        'points':points, 'event':command,
+                                        'phase':phase, 'attempt':new_attempt},
+                                       allow_nan=False) + '\n')
+                trace.flush()
+            if args.control and command in ('left','right'):
+                send_key(command)
+                print(f'Key: {command} accepted by Windows', flush=True)
+            draw_motion_guide(frame, recognizer, points)
             if recognizer.action:
                 dx = (recognizer.action[-1]['center'][0]
                       - recognizer.action[0]['center'][0])
@@ -88,8 +140,6 @@ def main():
             cv2.imshow('Gesture presentation',frame)
             if cv2.waitKey(1)&255 in (27,ord('q')) or cv2.getWindowProperty('Gesture presentation',cv2.WND_PROP_VISIBLE)<1:
                 break
-    finally:
-        camera.close()
 
 
 if __name__ == '__main__':

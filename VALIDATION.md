@@ -9,7 +9,7 @@
 - 通过 pip 的跨平台解析/下载核对 Windows 64 位 CPython 3.12 与 3.14：各自固定版本及依赖均有相应 wheel。此项仅证明发行包可取得，未在 Windows 实际安装或运行。
 - 在独立 Linux Python 3.12 环境中安装 MediaPipe 0.10.35 / OpenCV 4.13.0 / NumPy 2.3.5：`pip check`、Tasks API 导入及此前 8 项测试通过。此项不等于在 Windows Python 3.14 上实际运行。
 - 导入：MediaPipe 0.10.21 / OpenCV 4.11.0 / NumPy 1.26.4 成功。
-- `.venv/bin/python -m unittest discover -s tests -v`：13 项通过。
+- `.venv/bin/python -m unittest discover -s tests -v`：19 项通过。
   - 张掌与握拳形状、保持后暂停。
   - 单次连续挥手只触发一次。
   - 轻微抖动不翻页、初始暂停时不翻页。
@@ -21,6 +21,8 @@
   - 约 4 FPS 时张掌保持仍可启用控制，长时间断帧会取消动作。
   - 软件伽马查找表提亮中间灰度、保留黑白端点；非法伽马被拒绝。
   - 同一合成轨迹在 DEMO/CONTROL 下均识别为 right；仅 CONTROL 调用一次按键发送函数，退出时关闭摄像头，最近动作诊断超过 3 秒仍保留。窗口、摄像头与按键接口使用模拟对象，此项不证明真实 Windows 按键或 PPT 翻页成功。
+  - `--trace` 保存全部关键点和配置；回放与原识别事件一致，录制不覆盖已有文件。绘制掌心与幅度标线通过模拟摄像头流程运行，真人使用效果待确认。
+  - `inspect-trace` 的帧率、丢手比例、分段范围和事件统计；损坏文件拒绝、命令行 JSON 输出及禁止摘要覆盖原录制文件，均通过测试。检查器不调用摄像头或按键接口。
 - 编译检查及 app/tools 帮助入口：成功。
 - 已打包 Windows 安装与启动脚本；云端无法执行 `.cmd`，需用户电脑验证。
 - 手动曝光参数与 DirectShow 后端已加入程序；云端没有 Windows 摄像头，因此驱动是否接受 `--exposure` 仍需看本机输出的 `accepted/readback`。
