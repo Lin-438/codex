@@ -6,12 +6,12 @@ from gesture.core import Controller, classify, dtw, features
 CFG = json.load(open('config.json'))
 
 
-def hand(x=.5, fist=False):
+def hand(x=.5, fist=False, bent=0):
     p = np.zeros((21,3))
     p[0] = [x,.7,0]
-    for mcp,pip,dip,tip in [(5,6,7,8),(9,10,11,12),(13,14,15,16),(17,18,19,20)]:
+    for finger,(mcp,pip,dip,tip) in enumerate([(5,6,7,8),(9,10,11,12),(13,14,15,16),(17,18,19,20)]):
         xx = x+(mcp-9)*.006
-        for idx,y in [(mcp,.58),(pip,.49),(dip,.42),(tip,.35 if not fist else .63)]:
+        for idx,y in [(mcp,.58),(pip,.49),(dip,.42),(tip,.63 if fist or finger<bent else .35)]:
             p[idx] = [xx,y,0]
     return p.tolist()
 
@@ -19,7 +19,41 @@ def hand(x=.5, fist=False):
 class Tests(unittest.TestCase):
     def test_pose(self):
         self.assertEqual(features(hand())[2],'open')
+        self.assertEqual(features(hand(bent=1))[2],'open')
+        self.assertEqual(features(hand(bent=2))[2],'idle')
+        self.assertEqual(features(hand(bent=3))[2],'idle')
         self.assertEqual(features(hand(fist=True))[2],'fist')
+
+    def test_moderate_swipe_survives_one_unsteady_pose_frame(self):
+        c = Controller(CFG)
+        c.enabled = True
+        events = []
+        for i in range(90):
+            t = i/30
+            x = .3 + .14*min(max((t-.4)/.5, 0), 1)
+            event = c.update(t, hand(x, bent=2 if i==25 else 0))
+            if event:
+                events.append(event)
+        self.assertEqual(events, ['right'])
+
+    def test_return_swing_does_not_trigger(self):
+        c = Controller(CFG)
+        c.enabled = True
+        events = []
+        for i in range(90):
+            t = i/30
+            if t < .4:
+                x = .3
+            elif t < .7:
+                x = .3 + .16*(t-.4)/.3
+            elif t < 1.0:
+                x = .46 - .16*(t-.7)/.3
+            else:
+                x = .3
+            event = c.update(t, hand(x))
+            if event:
+                events.append(event)
+        self.assertEqual(events, [])
 
     def test_swipe_once_and_loss(self):
         c = Controller(CFG)

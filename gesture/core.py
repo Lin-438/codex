@@ -13,13 +13,24 @@ def features(points):
     # Distance ratio is rotation tolerant and does not depend on handedness.
     extended = [np.linalg.norm(p[tip] - p[0]) > 1.25 * np.linalg.norm(p[pip] - p[0])
                 for tip, pip in [(8, 6), (12, 10), (16, 14), (20, 18)]]
-    pose = 'open' if all(extended) else ('fist' if not any(extended) else 'idle')
+    # A briefly curled or occluded finger should not cancel an otherwise open hand.
+    count = sum(extended)
+    pose = 'open' if count >= 3 else ('fist' if count == 0 else 'idle')
     return center, relative, pose
 
 
 def trajectory(samples):
     xy = np.array([s['center'] for s in samples], dtype=float)
     return xy - xy[0]
+
+
+def motion_metrics(samples):
+    a = trajectory(samples)
+    dx = float(a[-1, 0])
+    vertical = float(np.ptp(a[:, 1]))
+    horizontal_path = float(np.abs(np.diff(a[:, 0])).sum())
+    straightness = abs(dx) / max(horizontal_path, 1e-6)
+    return dx, vertical, straightness
 
 
 def dtw(a, b):
@@ -36,10 +47,9 @@ def classify(samples, cfg, templates=None):
     if len(samples) < 3:
         return 'idle'
     a = trajectory(samples)
-    dx, dy = a[-1]
-    distance = np.abs(np.diff(a[:,0])).sum()
-    valid = (abs(dx) >= cfg['min_swipe'] and np.ptp(a[:,1]) <= cfg['max_vertical']
-             and abs(dx) / max(distance, 1e-6) >= .8)
+    dx, vertical, straightness = motion_metrics(samples)
+    valid = (abs(dx) >= cfg['min_swipe'] and vertical <= cfg['max_vertical']
+             and straightness >= .8)
     if not valid:
         return 'idle'
     if cfg['method'] == 'dtw':
@@ -56,6 +66,8 @@ class Controller:
         self.cfg, self.templates = cfg, templates
         self.enabled = False
         self.last_command = -math.inf
+        self.last_attempt = None
+        self.last_attempt_at = -math.inf
         self.reset()
 
     def reset(self):
@@ -67,17 +79,24 @@ class Controller:
         self.action = []
         self.last_center = None
         self.last_time = None
+        self.last_open_time = None
 
     def update(self, t, points):
         c = self.cfg
         if points is None:
+            if self.action:
+                self.last_attempt, self.last_attempt_at = 'tracking lost', t
             self.reset()  # never finish a gesture after tracking loss
             return None
         if self.last_time is not None and (t <= self.last_time or t-self.last_time > .25):
+            if self.action:
+                self.last_attempt, self.last_attempt_at = 'frame gap', t
             self.reset()
         self.last_time = t
         center, relative, pose = features(points)
         sample = {'t': t, 'center': center.tolist(), 'relative': relative.tolist()}
+        if pose == 'open':
+            self.last_open_time = t
         if pose != self.pose:
             self.pose, self.pose_since = pose, t
         if pose in ('open','fist') and t-self.pose_since >= c['hold_seconds']:
@@ -86,7 +105,12 @@ class Controller:
                 self.enabled = desired
                 self.reset()
                 return 'enabled' if desired else 'paused'
-        if not self.enabled or pose != 'open' or t-self.last_command < c['cooldown_seconds']:
+        open_enough = pose == 'open' or (bool(self.action) and pose == 'idle'
+                       and self.last_open_time is not None
+                       and t-self.last_open_time <= c.get('pose_grace_seconds', .15))
+        if not self.enabled or not open_enough or t-self.last_command < c['cooldown_seconds']:
+            if self.action and not open_enough:
+                self.last_attempt, self.last_attempt_at = 'hand shape changed', t
             self.anchor = None
             self.armed = False
             self.action = []
@@ -112,9 +136,15 @@ class Controller:
                 self.last_center = center.copy()
                 self.still_since = t
             if t-self.action[0]['t'] > c['max_action_seconds']:
+                self.last_attempt, self.last_attempt_at = 'motion timeout', t
                 self.reset()
             elif t-self.still_since >= c['stable_seconds']:
                 label = classify(self.action, c, self.templates)
+                dx, vertical, straightness = motion_metrics(self.action)
+                self.last_attempt = (f'{label} dx={dx:+.2f}/{c["min_swipe"]:.2f} '
+                                     f'y={vertical:.2f}/{c["max_vertical"]:.2f} '
+                                     f'straight={straightness:.2f}')
+                self.last_attempt_at = t
                 self.reset()
                 if label != 'idle':
                     self.last_command = t

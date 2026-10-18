@@ -14,10 +14,11 @@
   "hold_seconds": 0.8,
   "stable_seconds": 0.18,
   "cooldown_seconds": 1.0,
-  "min_swipe": 0.18,
-  "max_vertical": 0.12,
+  "min_swipe": 0.12,
+  "max_vertical": 0.14,
+  "pose_grace_seconds": 0.15,
   "motion_start": 0.035,
   "motion_end": 0.018,
-  "max_action_seconds": 1.5,
+  "max_action_seconds": 2.0,
   "dtw_threshold": 0.18
 }
